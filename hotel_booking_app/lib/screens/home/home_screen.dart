@@ -3,7 +3,7 @@ import '../../utils/routes.dart';
 import 'pages/map_page.dart';
 import 'pages/explore_page.dart';
 import 'pages/bookings_page.dart';
-import 'pages/profile_page.dart';
+import 'pages/profile_tab_page.dart';
 import 'search_delegate.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,34 +14,48 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Navigation
   int _currentIndex = 0;
   
-  // Filter states (only for map page)
+  // Filter states
   bool _showFilters = false;
   double _price = 1000;
   double _distance = 10;
   String _hotelType = 'All';
 
-  final List<String> _hotelTypes = ['All', 'Budget', 'Mid-range', 'Luxury', 'Boutique'];
-
-  // Pages for navigation
   final List<Widget> _pages = [
-    const MapPage(),
+    // Map page will be added dynamically
+    Container(), // Placeholder
     const ExplorePage(),
     const BookingsPage(),
-    const ProfilePage(),
+    ProfileTabPage(), // NO 'const' keyword
   ];
 
   @override
   Widget build(BuildContext context) {
+    // Update map page with current state
+    _pages[0] = MapPage(
+      onMapTap: _hideFilters,
+      showFilters: _showFilters,
+      onFilterToggle: _toggleFilters,
+      price: _price,
+      distance: _distance,
+      hotelType: _hotelType,
+      onPriceChanged: (value) => setState(() => _price = value),
+      onDistanceChanged: (value) => setState(() => _distance = value),
+      onHotelTypeChanged: (value) => setState(() => _hotelType = value),
+      onApplyFilters: _applyFilters,
+      onResetFilters: _resetFilters,
+    );
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black),
-          onPressed: () => Scaffold.of(context).openDrawer(),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.black),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         title: const Text(
           'EthioStay',
@@ -60,9 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // Current Page
           _pages[_currentIndex],
           
-          // Filter-specific widgets (only on Map page)
-          if (_currentIndex == 0) ...[
-            // Current Filters (Top)
+          // Current Filters Bar (Top) - Only on Map page
+          if (_currentIndex == 0)
             Positioned(
               top: 20,
               left: 20,
@@ -70,20 +83,27 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildCurrentFilters(),
             ),
 
-            // My Location Button
+          // My Location Button - Only on Map page (no FAB to avoid hero conflict)
+          if (_currentIndex == 0)
             Positioned(
               bottom: 100,
               right: 20,
-              child: FloatingActionButton.small(
-                onPressed: _goToMyLocation,
-                backgroundColor: Colors.white,
-                child: const Icon(Icons.my_location, color: Color(0xFF0A1F3A)),
+              child: Material(
+                borderRadius: BorderRadius.circular(30),
+                color: Colors.white,
+                elevation: 3,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(30),
+                  onTap: _goToMyLocation,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    padding: EdgeInsets.all(8),
+                    child: Icon(Icons.my_location, color: Color(0xFF0A1F3A)),
+                  ),
+                ),
               ),
             ),
-
-            // Filters Panel
-            if (_showFilters) _buildFiltersPanel(),
-          ],
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -112,10 +132,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: _currentIndex == 0 
-          ? FloatingActionButton(
-              onPressed: () => setState(() => _showFilters = !_showFilters),
-              backgroundColor: const Color(0xFF0A1F3A),
-              child: Icon(_showFilters ? Icons.close : Icons.filter_list),
+          ? Container(
+              margin: EdgeInsets.only(bottom: 70),
+              child: FloatingActionButton(
+                onPressed: _toggleFilters,
+                backgroundColor: const Color(0xFF0A1F3A),
+                child: Icon(_showFilters ? Icons.close : Icons.filter_list),
+              ),
             )
           : null,
       drawer: _buildDrawer(),
@@ -170,185 +193,55 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFiltersPanel() {
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: Container(
-        height: 400,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20)],
-        ),
+  Widget _buildDrawer() {
+    return Drawer(
+      child: SingleChildScrollView(
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
+              height: 200,
+              color: const Color(0xFF0A1F3A),
+              padding: const EdgeInsets.only(top: 50),
+              child: const Column(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.person, size: 50, color: Color(0xFF0A1F3A)),
                   ),
-                  const SizedBox(height: 15),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Filters', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      IconButton(
-                        icon: const Icon(Icons.keyboard_arrow_down),
-                        onPressed: () => setState(() => _showFilters = false),
-                      ),
-                    ],
-                  ),
+                  SizedBox(height: 15),
+                  Text('John Doe', style: TextStyle(color: Colors.white, fontSize: 18)),
+                  SizedBox(height: 5),
+                  Text('user@example.com', style: TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    _buildFilterItem(
-                      title: 'Price Range: ETB ${_price.toInt()}',
-                      child: Slider(
-                        value: _price,
-                        min: 100,
-                        max: 5000,
-                        onChanged: (value) => setState(() => _price = value),
-                        activeColor: const Color(0xFF0A1F3A),
-                      ),
-                      minLabel: 'ETB 100',
-                      maxLabel: 'ETB 5000',
-                    ),
-                    const SizedBox(height: 25),
-                    _buildFilterItem(
-                      title: 'Distance: ${_distance.toInt()} km',
-                      child: Slider(
-                        value: _distance,
-                        min: 1,
-                        max: 50,
-                        onChanged: (value) => setState(() => _distance = value),
-                        activeColor: const Color(0xFF0A1F3A),
-                      ),
-                      minLabel: '1 km',
-                      maxLabel: '50 km',
-                    ),
-                    const SizedBox(height: 25),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Hotel Type', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: _hotelTypes.map((type) {
-                            return ChoiceChip(
-                              label: Text(type),
-                              selected: _hotelType == type,
-                              onSelected: (_) => setState(() => _hotelType = type),
-                              selectedColor: const Color(0xFF0A1F3A),
-                              labelStyle: TextStyle(
-                                color: _hotelType == type ? Colors.white : Colors.black,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() => _showFilters = false);
-                          _showMessage('Filters applied: ETB ${_price.toInt()}, ${_distance.toInt()}km, $_hotelType');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A1F3A),
-                        ),
-                        child: const Text('Apply Filters', style: TextStyle(fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterItem({
-    required String title,
-    required Widget child,
-    required String minLabel,
-    required String maxLabel,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 10),
-        child,
-        const SizedBox(height: 5),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(minLabel, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text(maxLabel, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDrawer() {
-    return Drawer(
-      child: Column(
-        children: [
-          Container(
-            height: 200,
-            color: const Color(0xFF0A1F3A),
-            padding: const EdgeInsets.only(top: 50),
-            child: const Column(
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.white,
-                  child: Icon(Icons.person, size: 50, color: Color(0xFF0A1F3A)),
-                ),
-                SizedBox(height: 15),
-                Text('John Doe', style: TextStyle(color: Colors.white, fontSize: 18)),
-                SizedBox(height: 5),
-                Text('user@example.com', style: TextStyle(color: Colors.white70)),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
+            ListView(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               children: [
                 _drawerItem(Icons.home, 'Home', () => Navigator.pop(context)),
-                _drawerItem(Icons.person, 'Profile', () {}),
-                _drawerItem(Icons.bookmark, 'Bookings', () {}),
-                _drawerItem(Icons.favorite, 'Favorites', () {}),
-                _drawerItem(Icons.settings, 'Settings', () {}),
+                _drawerItem(Icons.person, 'Profile', () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _currentIndex = 3;
+                  });
+                }),
+                _drawerItem(Icons.bookmark, 'Bookings', () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _currentIndex = 2;
+                  });
+                }),
+                _drawerItem(Icons.favorite, 'Favorites', () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, AppRoutes.favorites);
+                }),
+                _drawerItem(Icons.settings, 'Settings', () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, AppRoutes.settings);
+                }),
                 const Divider(),
                 _drawerItem(Icons.logout, 'Logout', () {
                   Navigator.pop(context);
@@ -356,8 +249,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 }, color: Colors.red),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -380,6 +273,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _goToMyLocation() {
     _showMessage('Navigating to your location...');
+  }
+
+  void _toggleFilters() {
+    setState(() {
+      _showFilters = !_showFilters;
+    });
+  }
+
+  void _hideFilters() {
+    if (_showFilters) {
+      setState(() {
+        _showFilters = false;
+      });
+    }
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _showFilters = false;
+    });
+    _showMessage('Filters applied: ETB ${_price.toInt()}, ${_distance.toInt()}km, $_hotelType');
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _price = 1000;
+      _distance = 10;
+      _hotelType = 'All';
+    });
+    _showMessage('All filters have been reset');
   }
 
   void _showMessage(String message) {
