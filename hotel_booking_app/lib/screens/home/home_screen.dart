@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../utils/routes.dart';
+import 'pages/map_page.dart';
+import 'pages/explore_page.dart';
+import 'pages/bookings_page.dart';
+import 'pages/profile_page.dart';
+import 'search_delegate.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -9,492 +14,382 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Menu drawer state
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  // Navigation
+  int _currentIndex = 0;
   
-  // Filter values
-  double _priceRange = 1000;
-  double _distanceRange = 10;
-  
-  // Bottom sheet visibility
-  bool _showFilters = true;
+  // Filter states (only for map page)
+  bool _showFilters = false;
+  double _price = 1000;
+  double _distance = 10;
+  String _hotelType = 'All';
+
+  final List<String> _hotelTypes = ['All', 'Budget', 'Mid-range', 'Luxury', 'Boutique'];
+
+  // Pages for navigation
+  final List<Widget> _pages = [
+    const MapPage(),
+    const ExplorePage(),
+    const BookingsPage(),
+    const ProfilePage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
         leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black, size: 28),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          icon: const Icon(Icons.menu, color: Colors.black),
+          onPressed: () => Scaffold.of(context).openDrawer(),
         ),
         title: const Text(
           'EthioStay',
-          style: TextStyle(
-            color: Color(0xFF0A1F3A),
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black, size: 28),
-            onPressed: () {
-              // TODO: Implement search
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.black, size: 28),
-            onPressed: () {
-              // TODO: Implement notifications
-            },
+            icon: const Icon(Icons.search, color: Colors.black),
+            onPressed: _showSearch,
           ),
         ],
       ),
-      drawer: _buildDrawer(),
       body: Stack(
         children: [
-          // Map Section
-          _buildMapSection(),
+          // Current Page
+          _pages[_currentIndex],
           
-          // Filters Bottom Sheet
-          if (_showFilters) _buildFiltersBottomSheet(),
+          // Filter-specific widgets (only on Map page)
+          if (_currentIndex == 0) ...[
+            // Current Filters (Top)
+            Positioned(
+              top: 20,
+              left: 20,
+              right: 20,
+              child: _buildCurrentFilters(),
+            ),
+
+            // My Location Button
+            Positioned(
+              bottom: 100,
+              right: 20,
+              child: FloatingActionButton.small(
+                onPressed: _goToMyLocation,
+                backgroundColor: Colors.white,
+                child: const Icon(Icons.my_location, color: Color(0xFF0A1F3A)),
+              ),
+            ),
+
+            // Filters Panel
+            if (_showFilters) _buildFiltersPanel(),
+          ],
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: const Color(0xFF0A1F3A),
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.explore),
+            label: 'Explore',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bookmark),
+            label: 'Bookings',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+      floatingActionButton: _currentIndex == 0 
+          ? FloatingActionButton(
+              onPressed: () => setState(() => _showFilters = !_showFilters),
+              backgroundColor: const Color(0xFF0A1F3A),
+              child: Icon(_showFilters ? Icons.close : Icons.filter_list),
+            )
+          : null,
+      drawer: _buildDrawer(),
+    );
+  }
+
+  Widget _buildCurrentFilters() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.filter_list, size: 20, color: Color(0xFF0A1F3A)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('ETB ${_price.toInt()}'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('${_distance.toInt()} km'),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(_hotelType),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down, size: 24),
+            onPressed: () => setState(() => _showFilters = true),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMapSection() {
+  Widget _buildFilterChip(String label) {
     return Container(
-      color: Colors.grey[200],
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.map_outlined,
-              size: 100,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Map View',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Hotel locations will appear here',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[500],
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () {
-                // TODO: Request location permission
-              },
-              icon: const Icon(Icons.location_on),
-              label: const Text('Enable Location'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A1F3A),
-              ),
-            ),
-          ],
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1F3A).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
       ),
+      child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF0A1F3A))),
     );
   }
 
-  Widget _buildFiltersBottomSheet() {
+  Widget _buildFiltersPanel() {
     return Positioned(
       left: 0,
       right: 0,
       bottom: 0,
       child: Container(
+        height: 400,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(20),
             topRight: Radius.circular(20),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20)],
         ),
-        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 60,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 15),
-            
-            // Toggle button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Filters',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0A1F3A),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    _showFilters ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                    size: 28,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _showFilters = !_showFilters;
-                    });
-                  },
-                ),
-              ],
-            ),
-            
-            if (_showFilters) ...[
-              const SizedBox(height: 20),
-              
-              // Price Range Filter
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Price Range',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      Text(
-                        'ETB ${_priceRange.round()}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A1F3A),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Slider(
-                    value: _priceRange,
-                    min: 100,
-                    max: 5000,
-                    divisions: 49,
-                    label: 'ETB ${_priceRange.round()}',
-                    onChanged: (value) {
-                      setState(() {
-                        _priceRange = value;
-                      });
-                    },
-                    activeColor: const Color(0xFF0A1F3A),
-                    inactiveColor: Colors.grey[300],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text('ETB 100'),
-                      Text('ETB 5000'),
-                    ],
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 30),
-              
-              // Distance Filter
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Nearest Distance',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      Text(
-                        '${_distanceRange.round()} km',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A1F3A),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Slider(
-                    value: _distanceRange,
-                    min: 1,
-                    max: 50,
-                    divisions: 49,
-                    label: '${_distanceRange.round()} km',
-                    onChanged: (value) {
-                      setState(() {
-                        _distanceRange = value;
-                      });
-                    },
-                    activeColor: const Color(0xFF0A1F3A),
-                    inactiveColor: Colors.grey[300],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      Text('1 km'),
-                      Text('50 km'),
-                    ],
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 30),
-              
-              // Hotel Type Filters
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Hotel Type',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Filters', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.keyboard_arrow_down),
+                        onPressed: () => setState(() => _showFilters = false),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    _buildFilterItem(
+                      title: 'Price Range: ETB ${_price.toInt()}',
+                      child: Slider(
+                        value: _price,
+                        min: 100,
+                        max: 5000,
+                        onChanged: (value) => setState(() => _price = value),
+                        activeColor: const Color(0xFF0A1F3A),
+                      ),
+                      minLabel: 'ETB 100',
+                      maxLabel: 'ETB 5000',
+                    ),
+                    const SizedBox(height: 25),
+                    _buildFilterItem(
+                      title: 'Distance: ${_distance.toInt()} km',
+                      child: Slider(
+                        value: _distance,
+                        min: 1,
+                        max: 50,
+                        onChanged: (value) => setState(() => _distance = value),
+                        activeColor: const Color(0xFF0A1F3A),
+                      ),
+                      minLabel: '1 km',
+                      maxLabel: '50 km',
+                    ),
+                    const SizedBox(height: 25),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHotelTypeChip('All', true),
-                        const SizedBox(width: 10),
-                        _buildHotelTypeChip('Budget', false),
-                        const SizedBox(width: 10),
-                        _buildHotelTypeChip('Mid-range', false),
-                        const SizedBox(width: 10),
-                        _buildHotelTypeChip('Luxury', false),
-                        const SizedBox(width: 10),
-                        _buildHotelTypeChip('Boutique', false),
+                        const Text('Hotel Type', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _hotelTypes.map((type) {
+                            return ChoiceChip(
+                              label: Text(type),
+                              selected: _hotelType == type,
+                              onSelected: (_) => setState(() => _hotelType = type),
+                              selectedColor: const Color(0xFF0A1F3A),
+                              labelStyle: TextStyle(
+                                color: _hotelType == type ? Colors.white : Colors.black,
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 30),
-              
-              // Apply Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Apply filters and update map
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Filters applied successfully!'),
-                        backgroundColor: Colors.green,
+                    const SizedBox(height: 30),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => _showFilters = false);
+                          _showMessage('Filters applied: ETB ${_price.toInt()}, ${_distance.toInt()}km, $_hotelType');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0A1F3A),
+                        ),
+                        child: const Text('Apply Filters', style: TextStyle(fontSize: 16)),
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A1F3A),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ),
-                  child: const Text(
-                    'Apply Filters',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHotelTypeChip(String label, bool isSelected) {
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        // TODO: Handle selection
-      },
-      backgroundColor: Colors.grey[200],
-      selectedColor: const Color(0xFF0A1F3A),
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black,
-        fontWeight: FontWeight.w500,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+  Widget _buildFilterItem({
+    required String title,
+    required Widget child,
+    required String minLabel,
+    required String maxLabel,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 10),
+        child,
+        const SizedBox(height: 5),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(minLabel, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(maxLabel, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildDrawer() {
     return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
+      child: Column(
         children: [
-          // Drawer Header
           Container(
             height: 200,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0A1F3A),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            color: const Color(0xFF0A1F3A),
+            padding: const EdgeInsets.only(top: 50),
+            child: const Column(
               children: [
-                const CircleAvatar(
-                  radius: 50,
+                CircleAvatar(
+                  radius: 40,
                   backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.person,
-                    size: 60,
-                    color: Color(0xFF0A1F3A),
-                  ),
+                  child: Icon(Icons.person, size: 50, color: Color(0xFF0A1F3A)),
                 ),
-                const SizedBox(height: 15),
-                const Text(
-                  'John Doe',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'john.doe@example.com',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 14,
-                  ),
-                ),
+                SizedBox(height: 15),
+                Text('John Doe', style: TextStyle(color: Colors.white, fontSize: 18)),
+                SizedBox(height: 5),
+                Text('user@example.com', style: TextStyle(color: Colors.white70)),
               ],
             ),
           ),
-          
-          // Menu Items
-          _buildDrawerItem(
-            icon: Icons.home,
-            title: 'Home',
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.person,
-            title: 'Profile',
-            onTap: () {
-              // TODO: Navigate to profile
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.bookmark_border,
-            title: 'My Bookings',
-            onTap: () {
-              // TODO: Navigate to bookings
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.favorite_border,
-            title: 'Favorites',
-            onTap: () {
-              // TODO: Navigate to favorites
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.settings,
-            title: 'Settings',
-            onTap: () {
-              // TODO: Navigate to settings
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.help_outline,
-            title: 'Help & Support',
-            onTap: () {
-              // TODO: Navigate to help
-            },
-          ),
-          _buildDrawerItem(
-            icon: Icons.info_outline,
-            title: 'About Us',
-            onTap: () {
-              // TODO: Navigate to about
-            },
-          ),
-          
-          const Divider(),
-          
-          _buildDrawerItem(
-            icon: Icons.logout,
-            title: 'Logout',
-            onTap: () {
-              // TODO: Clear auth token
-              Navigator.pushReplacementNamed(context, AppRoutes.login);
-            },
-            color: Colors.red,
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _drawerItem(Icons.home, 'Home', () => Navigator.pop(context)),
+                _drawerItem(Icons.person, 'Profile', () {}),
+                _drawerItem(Icons.bookmark, 'Bookings', () {}),
+                _drawerItem(Icons.favorite, 'Favorites', () {}),
+                _drawerItem(Icons.settings, 'Settings', () {}),
+                const Divider(),
+                _drawerItem(Icons.logout, 'Logout', () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacementNamed(context, AppRoutes.login);
+                }, color: Colors.red),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDrawerItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color color = Colors.black87,
-  }) {
+  Widget _drawerItem(IconData icon, String title, VoidCallback onTap, {Color color = Colors.black}) {
     return ListTile(
       leading: Icon(icon, color: color),
-      title: Text(
-        title,
-        style: TextStyle(color: color),
-      ),
+      title: Text(title, style: TextStyle(color: color)),
       onTap: onTap,
+    );
+  }
+
+  // Actions
+  void _showSearch() {
+    showSearch(
+      context: context,
+      delegate: HotelSearchDelegate(),
+    );
+  }
+
+  void _goToMyLocation() {
+    _showMessage('Navigating to your location...');
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(top: 20, left: 20, right: 20),
+      ),
     );
   }
 }
